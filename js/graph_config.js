@@ -229,6 +229,10 @@ GraphConfig.load = function(config) {
     GraphConfig.getDefaultCurveForField = function(flightLog, fieldName) {
         var
             sysConfig = flightLog.getSysConfig();
+
+        if(flightLog && flightLog.api.exists(fieldName)) {
+            fieldName = flightLog.api.display(fieldName);
+        }
         
         try {
             if (fieldName.match(/^motor\[/)) {

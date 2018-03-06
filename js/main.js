@@ -604,7 +604,7 @@ function BlackboxLogViewer() {
             flightLogDataArray = new Uint8Array(bytes);
             
             try {
-                flightLog = new FlightLog(flightLogDataArray);
+                flightLog = new FlightLog(flightLogDataArray, userSettings);
             } catch (err) {
                 alert("Sorry, an error occured while trying to open this log:\n\n" + err);
                 return;

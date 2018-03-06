@@ -230,6 +230,7 @@ function dist() {
         './js/flightlog_index.js',
         './js/flightlog_parser.js',
         './js/flightlog_video_renderer.js',
+        './js/blackbox_api.js',
         './js/graph_config.js',
         './js/graph_config_dialog.js',
         './js/graph_legend.js',

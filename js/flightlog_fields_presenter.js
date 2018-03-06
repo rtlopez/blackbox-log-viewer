@@ -315,7 +315,11 @@ function FlightLogFieldPresenter() {
     FlightLogFieldPresenter.decodeFieldToFriendly = function(flightLog, fieldName, value, currentFlightMode) {
         if (value === undefined)
             return "";
-        
+
+        if(flightLog && flightLog.api.exists(fieldName)) {
+            fieldName = flightLog.api.display(fieldName);
+        }
+
         switch (fieldName) {
             case 'time':
                 return formatTime(value / 1000, true);

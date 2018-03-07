@@ -37,7 +37,7 @@ function UserSettingsDialog(dialog, onLoad, onSave) {
 	// Setup Defaults....
 
 	var defaultScriptContent = '' +
-'var filter = blackbox.crateFilterPT1(100);' +
+'var filter = blackbox.crateFilterPT1(100);\n' +
 'blackbox.add({\n' +
 '  field: \'virtualField[0]\',\n' +
 '  display: \'gyroADC[0]\',\n' +

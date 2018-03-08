@@ -121,3 +121,8 @@
 	position: absolute;
 	left: 50px;
 }
+
+.user-settings-dialog .script-settings textarea {
+	height: 8em;
+	margin-bottom: 10px;
+}

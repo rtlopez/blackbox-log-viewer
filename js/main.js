@@ -22,7 +22,7 @@ function BlackboxLogViewer() {
         GRAPH_STATE_PLAY = 1,
         
         SMALL_JUMP_TIME = 100 * 1000,
-        PLAYBACK_MIN_RATE = 5,
+        PLAYBACK_MIN_RATE = 10,
         PLAYBACK_MAX_RATE = 300,
         PLAYBACK_DEFAULT_RATE = 100,
         PLAYBACK_RATE_STEP = 5,
@@ -103,7 +103,29 @@ function BlackboxLogViewer() {
         playbackRate = PLAYBACK_DEFAULT_RATE,
 
         graphZoom = GRAPH_DEFAULT_ZOOM,
-        lastGraphZoom = GRAPH_DEFAULT_ZOOM; // QuickZoom function.
+        lastGraphZoom = GRAPH_DEFAULT_ZOOM, // QuickZoom function.
+        currentWindowId;
+
+        if (chrome.windows) {
+            chrome.windows.getCurrent(function(currentWindow) {
+                currentWindowId = currentWindow.id;
+            });
+        }
+
+        function createNewBlackboxWindow(fileToOpen) {
+            chrome.app.window.create('index.html', 
+            {
+                'innerBounds' : {
+                    'width'  : INNER_BOUNDS_WIDTH,
+                    'height' : INNER_BOUNDS_HEIGHT
+                }
+            },
+            function (createdWindow) {
+                if (fileToOpen !== undefined) {
+                    createdWindow.contentWindow.argv = fileToOpen;
+                }
+            });
+        }
 
     function blackboxTimeFromVideoTime() {
         return (video.currentTime - videoOffset) * 1000000 + flightLog.getMinTime();
@@ -570,7 +592,48 @@ function BlackboxLogViewer() {
         setGraphState(GRAPH_STATE_PAUSED);
         setGraphZoom(graphZoom);
     }
+
+    function loadFileMessage(fileName) {
+        $("#loading-file-text").text(`Trying to load file ${fileName}...`);
+        $("#loading-file-text").show();
+    }
     
+    function loadFiles(files) {
+        for (var i = 0; i < files.length; i++) {
+            var
+                isLog = files[i].name.match(/\.(BBL|TXT|CFL|BFL|LOG)$/i),
+                isVideo = files[i].name.match(/\.(AVI|MOV|MP4|MPEG)$/i),
+                isWorkspaces = files[i].name.match(/\.(JSON)$/i);
+
+            loadFileMessage(files[i].name);
+
+            if (!isLog && !isVideo && !isWorkspaces) {
+                if (files[i].size < 10 * 1024 * 1024)
+                    isLog = true; //Assume small files are logs rather than videos
+                else
+                    isVideo = true;
+            }
+            
+            if (isLog) {
+                loadLogFile(files[i]);
+            } else if (isVideo) {
+                loadVideo(files[i]);
+            } else if (isWorkspaces) {
+                loadWorkspaces(files[i])
+            }
+        }
+
+        // finally, see if there is an offsetCache value already, and auto set the offset
+        for(i=0; i<offsetCache.length; i++) {
+            if(
+                (currentOffsetCache.log   == offsetCache[i].log)   &&
+                (currentOffsetCache.index == offsetCache[i].index) &&
+                (currentOffsetCache.video == offsetCache[i].video)    ) {
+                    setVideoOffset(offsetCache[i].offset, true);
+                }
+        }
+    }
+
     function loadLogFile(file) {
         var reader = new FileReader();
     
@@ -672,11 +735,15 @@ function BlackboxLogViewer() {
     }
 
     function onLegendSelectionChange() {
-            hasAnalyser = true;
-            graph.setDrawAnalyser(hasAnalyser);            
-            html.toggleClass("has-analyser", hasAnalyser);
-            prefs.set('hasAnalyser', hasAnalyser);
-            invalidateGraph();
+        hasAnalyser = true;
+        graph.setDrawAnalyser(hasAnalyser);            
+        html.toggleClass("has-analyser", hasAnalyser);
+        prefs.set('hasAnalyser', hasAnalyser);
+        invalidateGraph();
+    }
+
+    function onLegendHighlightChange() {
+        invalidateGraph();
     }
 
     function setMarker(state) { // update marker field
@@ -829,7 +896,7 @@ function BlackboxLogViewer() {
             $(".viewer-download").hide();
         }
 
-        graphLegend = new GraphLegend($(".log-graph-legend"), activeGraphConfig, onLegendVisbilityChange, onLegendSelectionChange, zoomGraphConfig, expandGraphConfig, newGraphConfig);
+        graphLegend = new GraphLegend($(".log-graph-legend"), activeGraphConfig, onLegendVisbilityChange, onLegendSelectionChange, onLegendHighlightChange, zoomGraphConfig, expandGraphConfig, newGraphConfig);
         
         prefs.get('log-legend-hidden', function(item) {
             if (item) {
@@ -877,41 +944,9 @@ function BlackboxLogViewer() {
         
         $(".file-open").change(function(e) {
             var 
-                files = e.target.files,
-                i;
+                files = e.target.files;
 
-            for (i = 0; i < files.length; i++) {
-                var
-                    isLog = files[i].name.match(/\.(BBL|TXT|CFL|BFL|LOG)$/i),
-                    isVideo = files[i].name.match(/\.(AVI|MOV|MP4|MPEG)$/i),
-                    isWorkspaces = files[i].name.match(/\.(JSON)$/i);
-                
-                if (!isLog && !isVideo && !isWorkspaces) {
-                    if (files[i].size < 10 * 1024 * 1024)
-                        isLog = true; //Assume small files are logs rather than videos
-                    else
-                        isVideo = true;
-                }
-                
-                if (isLog) {
-                    loadLogFile(files[i]);
-                } else if (isVideo) {
-                    loadVideo(files[i]);
-                } else if (isWorkspaces) {
-                    loadWorkspaces(files[i])
-                }
-            }
-
-            // finally, see if there is an offsetCache value already, and auto set the offset
-            for(i=0; i<offsetCache.length; i++) {
-                if(
-                    (currentOffsetCache.log   == offsetCache[i].log)   &&
-                    (currentOffsetCache.index == offsetCache[i].index) &&
-                    (currentOffsetCache.video == offsetCache[i].video)    ) {
-                        setVideoOffset(offsetCache[i].offset, true);
-                    }
-
-            }
+            loadFiles(files);
         });
         
         // New View Controls
@@ -1080,7 +1115,7 @@ function BlackboxLogViewer() {
         $(".log-play-pause").click(logPlayPause);
         
         var logSyncHere = function() {
-            setVideoOffset(video.currentTime);
+            setVideoOffset(video.currentTime, true);
         };
         $(".log-sync-here").click(logSyncHere);
         
@@ -1863,7 +1898,7 @@ function BlackboxLogViewer() {
             .on("slide change set", function() {
                 setPlaybackRate(parseFloat($(this).val()));
             })
-            .Link("lower").to($(".playback-rate"));
+            .Link("lower").to($(".playback-rate-text"));
     
         $(".graph-zoom-control")
             .noUiSlider({
@@ -1889,6 +1924,68 @@ function BlackboxLogViewer() {
         });
         
         seekBar.onSeek = setCurrentBlackboxTime;
+
+        var checkIfFileAsParameter = function() {
+            if ((typeof argv !== 'undefined') && (argv.length > 0)) {
+                var fullPath = argv[0];
+                var filename = fullPath.replace(/^.*[\\\/]/, '')
+                var file = new File(fullPath, filename);
+                loadFiles([file]);
+            }    
+        }
+        checkIfFileAsParameter();
+
+        // File extension association
+        var onOpenFileAssociation = function() {
+            try {
+                var gui = require('nw.gui');
+                gui.App.on('open', function(path) {
+
+                    // All the windows opened try to open the new blackbox,
+                    // so we limit it to one of them, the first in the list for example
+                    chrome.windows.getAll(function(windows) {
+
+                        var firstWindow = windows[0];
+
+                        if (currentWindowId == firstWindow.id) {
+                            var filePathToOpenExpression = /.*"([^"]*)"$/;
+                            var fileToOpen = path.match(filePathToOpenExpression);
+
+                            if (fileToOpen.length > 1) {
+                                var fullPathFile = fileToOpen[1];
+                                createNewBlackboxWindow([fullPathFile]);
+                            }
+                        }
+
+                    });
+                });
+            } catch (e) {
+                // Require not supported, chrome app
+            }
+        }
+        onOpenFileAssociation();
+
+        /* drag and drop support */
+
+        window.ondragover = function(e) {
+            // prevent default behavior from changing page on dropped file
+            // NOTE: ondrop events WILL NOT WORK if you do not "preventDefault" in the ondragover event!!
+            e.preventDefault(); 
+            e.dataTransfer.dropEffect = 'copy';
+            return false; 
+        };
+
+        window.ondrop = function(e) { 
+            e.preventDefault();
+
+            const item = e.dataTransfer.items[0];
+            const entry = item.webkitGetAsEntry();
+            if (entry.isFile) {              
+              var file = e.dataTransfer.files[0];
+              loadFiles([file]);              
+            } 
+            return false;
+        };
 
     });
 }

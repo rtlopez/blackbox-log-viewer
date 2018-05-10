@@ -36,13 +36,14 @@ var
             YAW:   2
     }),
 
-        
-    FLIGHT_LOG_FLIGHT_MODE_NAME = makeReadOnly([
+    FLIGHT_LOG_FLIGHT_MODE_NAME = [],
+    
+    FLIGHT_LOG_FLIGHT_MODE_NAME_PRE_3_3 = makeReadOnly([
             'ARM',
             'ANGLE',
             'HORIZON',
             'BARO',
-            'VARIO',
+            'ANTIGRAVITY',
             'MAG',
             'HEADFREE',
             'HEADADJ',
@@ -67,8 +68,63 @@ var
             'BLACKBOX',
             'FAILSAFE',
             'AIRMODE',
-            'VTX',
+            '3DDISABLE',
+            'FPVANGLEMIX',
+            'BLACKBOXERASE',
+            'CAMERA1',
+            'CAMERA2',
+            'CAMERA3',
+            'FLIPOVERAFTERCRASH',
+            'PREARM',
             'CHECKBOX_ITEM_COUNT'
+    ]),
+
+    FLIGHT_LOG_FLIGHT_MODE_NAME_POST_3_3 = makeReadOnly([
+        'ARM',
+        'ANGLE',
+        'HORIZON',
+        'MAG',
+        'BARO',
+        'GPSHOME',
+        'GPSHOLD',
+        'HEADFREE',
+        'PASSTHRU',
+        'RANGEFINDER',
+        'FAILSAFE',
+        'ANTIGRAVITY',
+        'HEADADJ',
+        'CAMSTAB',
+        'CAMTRIG',
+        'BEEPER',
+        'LEDMAX',
+        'LEDLOW',
+        'LLIGHTS',
+        'CALIB',
+        'GOV',
+        'OSD',
+        'TELEMETRY',
+        'GTUNE',
+        'SERVO1',
+        'SERVO2',
+        'SERVO3',
+        'BLACKBOX',
+        'AIRMODE',
+        '3D',
+        'FPVANGLEMIX',
+        'BLACKBOXERASE',
+        'CAMERA1',
+        'CAMERA2',
+        'CAMERA3',
+        'FLIPOVERAFTERCRASH',
+        'PREARM',
+        'BEEPGPSCOUNT',
+        'VTXPITMODE',
+        'USER1',
+        'USER2',
+        'USER3',
+        'USER4',
+        'PIDAUDIO',
+        'CHECKBOX_ITEM_COUNT'
     ]),
 
     FLIGHT_LOG_FEATURES = makeReadOnly([
@@ -175,14 +231,29 @@ var
             "ESC_SENSOR",
             "SCHEDULER",
             "STACK",
-            "DEBUG_ESC_SENSOR_RPM",
-            "DEBUG_ESC_SENSOR_TMP",
-            "DEBUG_ALTITUDE",
-            "DEBUG_FFT",
-            "DEBUG_FFT_TIME",
-            "DEBUG_FFT_FREQ",
-            "DEBUG_FRSKY_D_RX",
-            "DEBUG_GYRO_RAW"
+            "ESC_SENSOR_RPM",
+            "ESC_SENSOR_TMP",
+            "ALTITUDE",
+            "FFT",
+            "FFT_TIME",
+            "FFT_FREQ",
+            "FRSKY_D_RX",
+            "GYRO_RAW",
+            "DUAL_GYRO",
+            "DUAL_GYRO_RAW",
+            "DUAL_GYRO_COMBINE",
+            "DUAL_GYRO_DIFF",
+            "MAX7456_SIGNAL",
+            "MAX7456_SPICLOCK",
+            "SBUS",
+            "FPORT",
+            "RANGEFINDER_QUALITY",
+            "LIDAR_TF",
+            "CORE_TEMP",
+            "RUNAWAY_TAKEOFF",
+            "SDIO",
+            "CURRENT_SENSOR",
+            "USB"
     ]),
 
     SUPER_EXPO_YAW = makeReadOnly([
@@ -204,6 +275,17 @@ var
             "20HZ",
             "10HZ",
             "5HZ",
+            "EXPERIMENTAL"
+    ]),
+
+    GYRO_HARDWARE_LPF = makeReadOnly([
+            "NORMAL",
+            "EXPERIMENTAL",
+            "1KHZ_SAMPLING"
+    ]),
+
+    GYRO_32KHZ_HARDWARE_LPF = makeReadOnly([
+            "NORMAL",
             "EXPERIMENTAL"
     ]),
 
@@ -259,7 +341,18 @@ function adjustFieldDefsList(firmwareType, firmwareVersion) {
         DEBUG_MODE.splice(DEBUG_MODE.indexOf('VELOCITY'),     1);
         DEBUG_MODE.splice(DEBUG_MODE.indexOf('DTERM_FILTER'), 1);
         DEBUG_MODE = makeReadOnly(DEBUG_MODE);
+
+        FLIGHT_LOG_FLIGHT_MODE_NAME = makeReadOnly(FLIGHT_LOG_FLIGHT_MODE_NAME_POST_3_3);
+
     } else {
         DEBUG_MODE = DEBUG_MODE_COMPLETE;
+
+        FLIGHT_LOG_FLIGHT_MODE_NAME = FLIGHT_LOG_FLIGHT_MODE_NAME_PRE_3_3.slice(0);
+
+        if((firmwareType == FIRMWARE_TYPE_BETAFLIGHT) && semver.lte(firmwareVersion, '3.1.6')) {
+            FLIGHT_LOG_FLIGHT_MODE_NAME.splice(FLIGHT_LOG_FLIGHT_MODE_NAME.indexOf('ANTIGRAVITY'), 1);
+        }
+
+        FLIGHT_LOG_FLIGHT_MODE_NAME = makeReadOnly(FLIGHT_LOG_FLIGHT_MODE_NAME);
     }
 }

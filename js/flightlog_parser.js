@@ -209,6 +209,8 @@ var FlightLogParser = function(logData) {
             serialrx_provider:null,         // name of the serial rx provider
             superExpoFactor:null,           // Super Expo Factor
             rates:[null, null, null],	    // Rates [ROLL, PITCH, YAW]
+            rc_rates:[null, null, null],	// RC Rates [ROLL, PITCH, YAW]
+            rc_expo:[null, null, null],	    // RC Expo [ROLL, PITCH, YAW]
             looptime:null,                  // Looptime
             gyro_sync_denom:null,           // Gyro Sync Denom
             pid_process_denom:null,         // PID Process Denom
@@ -234,6 +236,9 @@ var FlightLogParser = function(logData) {
             iterm_reset_offset:null,        // I-Term reset offset
             deadband:null,                  // Roll, Pitch Deadband
             yaw_deadband:null,              // Yaw Deadband
+            gyro_lpf:null,                  // Gyro lpf setting. (pre BF3.4)
+            gyro_hardware_lpf:null,         // Gyro hardware lpf setting. (post BF3.4)
+            gyro_32khz_hardware_lpf:null,   // Gyro 32khz hardware lpf setting. (post BF3.4)
             gyro_lpf:null,                  // Gyro lpf setting.
             gyro_lowpass_hz:null,           // Gyro Soft Lowpass Filter Hz
             gyro_notch_hz:null,             // Gyro Notch Frequency
@@ -262,7 +267,48 @@ var FlightLogParser = function(logData) {
             Craft_name:null,                // Craft Name
             motorOutput:[null,null],        // Minimum and maximum outputs to motor's
             digitalIdleOffset:null,         // min throttle for d-shot (as a percentage)
+            pidSumLimit:null,               // PID sum limit
+            pidSumLimitYaw:null,            // PID sum limit yaw
             unknownHeaders : []             // Unknown Extra Headers
+        },
+
+        // Translation of the field values name to the sysConfig var where it must be stored
+        translationValues = {                
+            acc_limit_yaw             : "yawRateAccelLimit",
+            accel_limit               : "rateAccelLimit",
+            acc_limit                 : "rateAccelLimit",
+            anti_gravity_thresh       : "anti_gravity_threshold",
+            currentSensor             : "currentMeter",
+            d_notch_cut               : "dterm_notch_cutoff", 
+            d_setpoint_weight         : "dtermSetpointWeight",
+            dterm_lowpass_hz          : "dterm_lpf_hz",
+            dterm_setpoint_weight     : "dtermSetpointWeight",  
+            digital_idle_value        : "digitalIdleOffset",
+            dshot_idle_value          : "digitalIdleOffset",
+            gyro_lowpass              : "gyro_lowpass_hz",
+            gyro_lowpass_type         : "gyro_lpf",
+            "gyro.scale"              : "gyro_scale",
+            iterm_windup              : "itermWindupPointPercent",
+            motor_pwm_protocol        : "fast_pwm_protocol",
+            pidsum_limit              : "pidSumLimit",
+            pidsum_limit_yaw          : "pidSumLimitYaw",
+            rc_expo                   : "rcExpo",
+            rc_expo_yaw               : "rcYawExpo",
+            rc_interp                 : "rc_interpolation",
+            rc_interp_int             : "rc_interpolation_interval",
+            rc_rate                   : "rcRate",
+            rc_rate_yaw               : "rcYawRate",
+            rc_yaw_expo               : "rcYawExpo",
+            setpoint_relax_ratio      : "setpointRelaxRatio",
+            setpoint_relaxation_ratio : "setpointRelaxRatio",
+            thr_expo                  : "thrExpo",
+            thr_mid                   : "thrMid",
+            tpa_rate                  : "dynThrPID",
+            use_unsynced_pwm          : "unsynced_fast_pwm",
+            vbat_scale                : "vbatscale",
+            vbat_pid_gain             : "vbat_pid_compensation",
+            yaw_accel_limit           : "yawRateAccelLimit",
+            yaw_lowpass_hz            : "yaw_lpf_hz"
         },
 
         frameTypes,
@@ -341,6 +387,21 @@ var FlightLogParser = function(logData) {
         return names;
     }
 
+    /**
+     * Translates the name of a field to the parameter in sysConfig object equivalent
+     * 
+     * fieldName Name of the field to translate
+     * returns The equivalent in the sysConfig object or the fieldName if not found
+     */
+    function translateFieldName(fieldName) {
+        var translation = translationValues[fieldName]; 
+        if (typeof translation !== 'undefined') {
+        	return translation;
+        } else {
+        	return fieldName;
+        }
+    }
+    
     function parseHeaderLine() {
         var
             COLON = ":".charCodeAt(0),
@@ -374,6 +435,10 @@ var FlightLogParser = function(logData) {
         fieldName = asciiArrayToString(stream.data.subarray(lineStart, separatorPos));
         fieldValue = asciiArrayToString(stream.data.subarray(separatorPos + 1, lineEnd));
 
+        // Translate the fieldName to the sysConfig parameter name. The fieldName has been changing between versions
+        // In this way is easier to maintain the code        
+        fieldName = translateFieldName(fieldName);
+        
         switch (fieldName) {
             case "I interval":
                 that.sysConfig.frameIntervalI = parseInt(fieldValue, 10);
@@ -386,7 +451,14 @@ var FlightLogParser = function(logData) {
                 if (matches) {
                     that.sysConfig.frameIntervalPNum = parseInt(matches[1], 10);
                     that.sysConfig.frameIntervalPDenom = parseInt(matches[2], 10);
+                } else {
+                    that.sysConfig.frameIntervalPNum = 1;
+                    that.sysConfig.frameIntervalPDenom = parseInt(fieldValue, 10);
                 }
+            break;
+            case "P denom":
+            case "P ratio":
+                // Don't do nothing with this, because is the same than frameIntervalI/frameIntervalPDenom so we don't need it
             break;
             case "Data version":
                 dataVersion = parseInt(fieldValue, 10);
@@ -446,6 +518,8 @@ var FlightLogParser = function(logData) {
             case "deadband":
             case "yaw_deadband":
             case "gyro_lpf":
+            case "gyro_hardware_lpf":
+            case "gyro_32khz_hardware_lpf":
             case "acc_lpf_hz":
             case "acc_hardware":
             case "baro_hardware":
@@ -466,6 +540,8 @@ var FlightLogParser = function(logData) {
             case "acc_1G":
             case "dterm_filter_type":
             case "pidAtMinThrottle":
+            case "pidSumLimit":
+            case "pidSumLimitYaw":
             case "anti_gravity_threshold":
             case "itermWindupPointPercent":
             case "ptermSRateWeight":
@@ -473,68 +549,30 @@ var FlightLogParser = function(logData) {
             case "dtermSetpointWeight":
             case "gyro_soft_type":
             case "debug_mode":
+            case "anti_gravity_gain":
                 that.sysConfig[fieldName] = parseInt(fieldValue, 10);
             break;
 
-            case "rc_rate":
-                that.sysConfig.rcRate = parseInt(fieldValue, 10);
-                break
-            case "rc_rate_yaw":
-                that.sysConfig.rcYawRate = parseInt(fieldValue, 10);
-                break
             case "rc_expo":
-                that.sysConfig.rcExpo = parseInt(fieldValue, 10);
-                break
-            case "rc_expo_yaw":
-                that.sysConfig.rcYawExpo = parseInt(fieldValue, 10);
-                break
-            case "thr_mid":
-                that.sysConfig.thrMid = parseInt(fieldValue, 10);
-                break
-            case "thr_expo":
-                that.sysConfig.thrExpo = parseInt(fieldValue, 10);
-                break
-            case "setpoint_relaxation_ratio":
-                that.sysConfig.setpointRelaxRatio = parseInt(fieldValue, 10);
-                break;
-                dynThrPID
-            case "dterm_setpoint_weight":
-                that.sysConfig.dtermSetpointWeight = parseInt(fieldValue, 10);
-                break
-            case "gyro_lowpass_type":
-                that.sysConfig.gyro_soft_type = parseInt(fieldValue, 10);
-                break
-            case "vbat_pid_gain":
-                that.sysConfig.vbat_pid_compensation = parseInt(fieldValue, 10);
-                break
-            case "dshot_idle_value":
-                that.sysConfig.digitalIdleOffset = parseInt(fieldValue, 10);
-                break
-            case "acc_limit":
-                that.sysConfig.rateAccelLimit = parseInt(fieldValue, 10);
-                break
-            case "acc_limit_yaw":
-                that.sysConfig.yawRateAccelLimit = parseInt(fieldValue, 10);
-                break
-            case "iterm_windup":
-                that.sysConfig.itermWindupPointPercent = parseInt(fieldValue, 10);
-                break
-            case "use_unsynced_pwm":
-                that.sysConfig.unsynced_fast_pwm = parseInt(fieldValue, 10);
-                break
-            case "motor_pwm_protocol":
-                that.sysConfig.fast_pwm_protocol = parseInt(fieldValue, 10);
-                break
-            case "tpa_rate":
-                that.sysConfig.dynThrPID = parseInt(fieldValue, 10);
+                if(stringHasComma(fieldValue)) {
+                    var expos = parseCommaSeparatedString(fieldValue);
+                    that.sysConfig[fieldName] = expos
+                    that.sysConfig.rcExpo = expos[0];
+                    if (firmwareGreaterOrEqual(that.sysConfig, '3.3.0', '2.3.0')) {
+                        that.sysConfig.rcYawExpo = expos[2];
+                    } else {
+                        that.sysConfig.rcYawExpo = expos[1];
+                    }
+                } else {
+                    that.sysConfig.rcExpo = parseInt(fieldValue, 10);
+                }
                 break
 
             case "yawRateAccelLimit":
-            case "rateAccelLimit":
-            case "anti_gravity_gain":
+            case "rateAccelLimit":            
                 if((that.sysConfig.firmwareType == FIRMWARE_TYPE_BETAFLIGHT  && semver.gte(that.sysConfig.firmwareVersion, '3.1.0')) ||
                    (that.sysConfig.firmwareType == FIRMWARE_TYPE_CLEANFLIGHT && semver.gte(that.sysConfig.firmwareVersion, '2.0.0'))) {
-                    that.sysConfig[fieldName] = uint32ToFloat(fieldValue, 10);
+                    that.sysConfig[fieldName] = parseInt(fieldValue, 10)/1000;
                 } else {
                     that.sysConfig[fieldName] = parseInt(fieldValue, 10);
                 }
@@ -574,7 +612,7 @@ var FlightLogParser = function(logData) {
             /** End of cleanflight only log headers **/
 
             case "superExpoFactor":
-                if(fieldValue.match(/.*,.*/)!=null) {
+                if(stringHasComma(fieldValue)) {
                     var expoParams = parseCommaSeparatedString(fieldValue);
                     that.sysConfig.superExpoFactor    = expoParams[0];
                     that.sysConfig.superExpoFactorYaw = expoParams[1];
@@ -598,6 +636,16 @@ var FlightLogParser = function(logData) {
             case "motorOutput":
                 that.sysConfig[fieldName] = parseCommaSeparatedString(fieldValue);
             break;
+            case "rc_rates":
+                var rc_rates = parseCommaSeparatedString(fieldValue);
+                that.sysConfig[fieldName] = rc_rates
+                that.sysConfig.rcRate = rc_rates[0];
+                if (firmwareGreaterOrEqual(that.sysConfig, '3.3.0', '2.3.0')) {
+                    that.sysConfig.rcYawRate = rc_rates[2];
+                } else {
+                    that.sysConfig.rcYawRate = rc_rates[1];
+                }
+            break;
             case "magPID":
                 that.sysConfig.magPID = parseCommaSeparatedString(fieldValue,3); //[parseInt(fieldValue, 10), null, null];
             break;
@@ -611,6 +659,7 @@ var FlightLogParser = function(logData) {
                 that.sysConfig.vbatmaxcellvoltage = vbatcellvoltageParams[2];
             break;
             case "currentMeter":
+            case "currentSensor":
                 var currentMeterParams = parseCommaSeparatedString(fieldValue);
 
                 that.sysConfig.currentMeterOffset = currentMeterParams[0];

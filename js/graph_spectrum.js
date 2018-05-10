@@ -62,7 +62,12 @@ try {
     if (sysConfig.pid_process_denom != null) {
 		pidRate = gyroRate / sysConfig.pid_process_denom;
 	}
-	var blackBoxRate = (gyroRate/pidRate) * pidRate * (sysConfig['frameIntervalPNum'] / sysConfig['frameIntervalPDenom']);
+    
+    var blackBoxRate = gyroRate * sysConfig['frameIntervalPNum'] / sysConfig['frameIntervalPDenom'];	
+    if (sysConfig.pid_process_denom != null) {
+        blackBoxRate = blackBoxRate / sysConfig.pid_process_denom;
+    }
+
 	var dataBuffer = {
 			fieldIndex: 0,
 			curve: 0,
@@ -120,7 +125,10 @@ try {
         });
 		$("input:last-of-type", parentElem).css({
 			left: (canvasCtx.canvas.width - 20) + "px"
-        });
+		});
+		$("#analyserResize", parentElem).css({
+			left: (canvasCtx.canvas.width - 28) + "px"
+		})
 
 	};
 	

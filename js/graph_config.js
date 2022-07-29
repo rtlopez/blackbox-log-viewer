@@ -195,6 +195,10 @@ GraphConfig.load = function(config) {
         var
             sysConfig = flightLog.getSysConfig();
 
+        if(flightLog && flightLog.api.exists(fieldName)) {
+            fieldName = flightLog.api.display(fieldName);
+        }
+        
         var maxDegreesSecond = function(scale) {
             switch(sysConfig["rates_type"]){
                 case RATES_TYPE.indexOf('ACTUAL'):

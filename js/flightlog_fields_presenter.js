@@ -779,6 +779,10 @@ function FlightLogFieldPresenter() {
         const highResolutionScale = (flightLog && flightLog.getSysConfig().blackbox_high_resolution > 0) ? 10 : 1;
         const highResolutionAddPrecision = (flightLog && flightLog.getSysConfig().blackbox_high_resolution > 0) ? 1 : 0;
 
+        if(flightLog && flightLog.api.exists(fieldName)) {
+            fieldName = flightLog.api.display(fieldName);
+        }
+
         switch (fieldName) {
             case 'time':
                 return formatTime(value / 1000, true);

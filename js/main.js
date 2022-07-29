@@ -686,7 +686,7 @@ function BlackboxLogViewer() {
             flightLogDataArray = new Uint8Array(bytes);
             
             try {
-                flightLog = new FlightLog(flightLogDataArray);
+                flightLog = new FlightLog(flightLogDataArray, userSettings);
             } catch (err) {
                 alert("Sorry, an error occured while trying to open this log:\n\n" + err);
                 return;
@@ -1361,9 +1361,15 @@ function BlackboxLogViewer() {
             },
 
             function(newSettings) { // onSave
-	            userSettings = newSettings;
+                var oldSettings = $.extend(true, {}, userSettings); // make temporary copy of current settings
+                $.extend(true, userSettings, newSettings);          // keep original object because there are references
+                prefs.set('userSettings', userSettings);
 
-	            prefs.set('userSettings', newSettings);
+                if(JSON.stringify(oldSettings.script) != JSON.stringify(userSettings.script)) {
+                    var oldBlackboxTime = currentBlackboxTime;
+                    selectLog(currentOffsetCache.index);     // reload log
+                    setCurrentBlackboxTime(oldBlackboxTime); // restore position
+                }
 
 	            // refresh the craft model
 	            if(graph!=null) {

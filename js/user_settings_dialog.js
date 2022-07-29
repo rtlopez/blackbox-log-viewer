@@ -36,6 +36,16 @@ function UserSettingsDialog(dialog, onLoad, onSave) {
 
 	// Setup Defaults....
 
+	var defaultScriptContent = '' +
+'const f1 = blackbox.createFilterPT1(100);\n' +
+'blackbox.add({\n' +
+'  field: \'virtualField[0]\', // target field name\n' +
+'  display: \'gyroADC[0]\', // scaling from\n' +
+'  process: function(frame){ // processing callback\n' +
+'    return f1(blackbox.getValue(frame, \'gyroADC[0]\'));\n' +
+'  }\n' +
+'});';
+
 	var defaultSettings = {
 		mixerConfiguration : 3, 				// Default to Quad-X
 		customMix 			: null,				// Default to no mixer configuration
@@ -91,6 +101,9 @@ function UserSettingsDialog(dialog, onLoad, onSave) {
 									top   : '50%',  			// position from top (as a percentage of height)
 									transparency : '40%',  // transparency of laptimer
 							  },
+		script: {
+			content: ''
+		}
 	};
 
 	var currentSettings = {};
@@ -140,6 +153,9 @@ function UserSettingsDialog(dialog, onLoad, onSave) {
 				drawLapTimer: ($(".laptimer").is(":checked")),
 				drawGradient: ($(".gradient").is(":checked")),
 				drawVerticalBar: ($(".verticalBar").is(":checked")),
+				script: {
+					content: $('.script-settings textarea[name="script-content"]').val()
+				}
     	});
     	return settings;
     }
@@ -419,6 +435,8 @@ function UserSettingsDialog(dialog, onLoad, onSave) {
     		$('.laptimer-settings input[name="laptimer-left"]').val(parseInt(currentSettings.laptimer.left));
     		$('.laptimer-settings input[name="laptimer-transparency"]').val(parseInt(currentSettings.laptimer.transparency));
 
+    		$('.script-settings textarea[name="script-content"]').val(currentSettings.script.content);
+    		$('.script-settings #script-example').text(defaultScriptContent);
 			if (currentSettings.drawGradient != null) {
 				// set the toggle switch
 				$(".gradient").prop('checked', currentSettings.drawGradient);

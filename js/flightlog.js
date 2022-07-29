@@ -9,12 +9,13 @@
  * Additional computed fields are derived from the original data set and added as new fields in the resulting data.
  * Window based smoothing of fields is offered.
  */
-function FlightLog(logData) {
+function FlightLog(logData, userSettings) {
     var
         ADDITIONAL_COMPUTED_FIELD_COUNT = 23, /** attitude + PID_SUM + PID_ERROR + RCCOMMAND_SCALED + MOTOR_LEGACY **/
 
         that = this,
         logIndex = false,
+        api = new BlackboxApi(that, userSettings),
         logIndexes = new FlightLogIndex(logData),
         parser = new FlightLogParser(logData),
 
@@ -34,9 +35,9 @@ function FlightLog(logData) {
 
         smoothedCache = new FIFOCache(2);
 
-
     //Public fields:
     this.parser = parser;
+    this.api = api;
 
     this.getMainFieldCount = function() {
         return fieldNames.length;
@@ -242,6 +243,8 @@ function FlightLog(logData) {
             }
         }
 
+        api.injectFieldNames(fieldNames);
+
         fieldNameToIndex = {};
         for (let i = 0; i < fieldNames.length; i++) {
             fieldNameToIndex[fieldNames[i]] = i;
@@ -392,7 +395,7 @@ function FlightLog(logData) {
                                 //The parser re-uses the "frame" array so we must copy that data somewhere else
 
                                 var
-                                    numOutputFields = frame.length + slowFrameLength + ADDITIONAL_COMPUTED_FIELD_COUNT;
+                                    numOutputFields = frame.length + slowFrameLength + ADDITIONAL_COMPUTED_FIELD_COUNT + api.getFieldCount();
 
                                 //Do we have a recycled chunk to copy on top of?
                                 if (chunk.frames[mainFrameIndex]) {
@@ -602,7 +605,7 @@ function FlightLog(logData) {
                     var
                         srcFrame = sourceChunk.frames[i],
                         destFrame = destChunk.frames[i],
-                        fieldIndex = destFrame.length - ADDITIONAL_COMPUTED_FIELD_COUNT;
+                        fieldIndex = destFrame.length - ADDITIONAL_COMPUTED_FIELD_COUNT - api.getFieldCount();
 
                     if (gyroADC) { //don't calculate attitude if no gyro data
                         attitude = chunkIMU.updateEstimatedAttitude(
@@ -683,6 +686,7 @@ function FlightLog(logData) {
                     // Remove empty fields at the end
                     destFrame.splice(fieldIndex);
 
+                    api.injectFieldValues(fieldIndex, destFrame, srcFrame);
                 }
             }
         }
